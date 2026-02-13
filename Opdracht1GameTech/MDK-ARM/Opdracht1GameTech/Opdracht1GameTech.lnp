@@ -1,0 +1,28 @@
+--cpu=Cortex-M4.fp.sp --branchpatch=sdcomp-29491-629360
+"opdracht1gametech\startup_stm32l432xx.o"
+"opdracht1gametech\main.o"
+"opdracht1gametech\stm32l4xx_it.o"
+"opdracht1gametech\stm32l4xx_hal_msp.o"
+"opdracht1gametech\stm32l4xx_hal_tim.o"
+"opdracht1gametech\stm32l4xx_hal_tim_ex.o"
+"opdracht1gametech\stm32l4xx_hal.o"
+"opdracht1gametech\stm32l4xx_hal_rcc.o"
+"opdracht1gametech\stm32l4xx_hal_rcc_ex.o"
+"opdracht1gametech\stm32l4xx_hal_flash.o"
+"opdracht1gametech\stm32l4xx_hal_flash_ex.o"
+"opdracht1gametech\stm32l4xx_hal_flash_ramfunc.o"
+"opdracht1gametech\stm32l4xx_hal_gpio.o"
+"opdracht1gametech\stm32l4xx_hal_i2c.o"
+"opdracht1gametech\stm32l4xx_hal_i2c_ex.o"
+"opdracht1gametech\stm32l4xx_hal_dma.o"
+"opdracht1gametech\stm32l4xx_hal_dma_ex.o"
+"opdracht1gametech\stm32l4xx_hal_pwr.o"
+"opdracht1gametech\stm32l4xx_hal_pwr_ex.o"
+"opdracht1gametech\stm32l4xx_hal_cortex.o"
+"opdracht1gametech\stm32l4xx_hal_exti.o"
+"opdracht1gametech\system_stm32l4xx.o"
+"opdracht1gametech\rc5_encode.o"
+--strict --scatter "Opdracht1GameTech\Opdracht1GameTech.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "Opdracht1GameTech.map" -o Opdracht1GameTech\Opdracht1GameTech.axf

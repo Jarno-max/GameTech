@@ -103,6 +103,26 @@ int main(void)
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
   HAL_Delay(200);
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+  
+  /* ========== OSCILLOSCOPE TEST OPTIONS ========== */
+  /* Uncomment ONE of the following test modes: */
+  
+  /* OPTION 1: Continuous 38kHz carrier for basic frequency/duty cycle measurement */
+  /* Measure on PA6: Should see constant 38kHz with 25% duty cycle */
+  
+  /* Re-enable PWM mode (RC5_Encode_Init sets it to forced inactive) */
+  TIM_OC_InitTypeDef sConfigOC_Test = {0};
+  sConfigOC_Test.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC_Test.Pulse = 210;  // 25% duty cycle
+  sConfigOC_Test.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC_Test.OCFastMode = TIM_OCFAST_DISABLE;
+  HAL_TIM_PWM_ConfigChannel(&htim16, &sConfigOC_Test, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
+  
+  /* OPTION 2: Send single RC5 test frame for Manchester encoding measurement */
+  /* Uncomment below to send one frame at startup, then stop */
+  // RC5_Encode_SendFrame(1, 12, RC5_CTRL_RESET);
+  // HAL_Delay(100);  // Wait for transmission to complete
 
   /* USER CODE END 2 */
 
@@ -114,6 +134,16 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     
+    /* ========== CONTINUOUS TEST MODE ========== */
+    /* OPTION 3: Send RC5 frames repeatedly every 2 seconds */
+    /* Uncomment below for continuous frame transmission */
+    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+    // RC5_Encode_SendFrame(1, 12, toggleBit);
+    // HAL_Delay(50);
+    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+    // HAL_Delay(2000);
+    
+    /* ========== BUTTON MODE (FINAL VERSION) ========== */
     /* Check if button is pressed */
     if (buttonPressed)
     {
@@ -272,7 +302,7 @@ static void MX_TIM16_Init(void)
   htim16.Instance = TIM16;
   htim16.Init.Prescaler = 0;
   htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 25;
+  htim16.Init.Period = 841;
   htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim16.Init.RepetitionCounter = 0;
   htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -285,7 +315,7 @@ static void MX_TIM16_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 210;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;

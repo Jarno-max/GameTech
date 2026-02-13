@@ -490,7 +490,7 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\x-cube-irremote\Projects\Common_IR\inc\ir_common.h</PathWithFileName>
+      <PathWithFileName>..\Core\Inc\ir_common.h</PathWithFileName>
       <FilenameWithoutPath>ir_common.h</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
@@ -502,7 +502,7 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\x-cube-irremote\Projects\Common_IR\inc\rc5_encode.h</PathWithFileName>
+      <PathWithFileName>..\Core\Inc\rc5_encode.h</PathWithFileName>
       <FilenameWithoutPath>rc5_encode.h</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
@@ -514,7 +514,7 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\x-cube-irremote\Projects\Common_IR\src\rc5_encode.c</PathWithFileName>
+      <PathWithFileName>..\Core\Src\rc5_encode.c</PathWithFileName>
       <FilenameWithoutPath>rc5_encode.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
