@@ -24,5 +24,6 @@ typedef enum
 void RC5_Encode_Init(void);
 void RC5_Encode_SendFrame(uint8_t RC5_Address, uint8_t RC5_Instruction, RC5_Ctrl_t RC5_Ctrl);
 void RC5_Encode_SignalGenerate(void);
+void RC5_Carrier_Enable(uint8_t enable);
 
 #endif /* __RC5_ENCODE_H */

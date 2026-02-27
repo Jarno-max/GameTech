@@ -26,16 +26,7 @@
  */
 #define IR_ENC_LPERIOD_RC5      ((uint32_t)889)   /* 889us bit half-period */
 
-/* Timer definitions */
-#define TIM_FORCED_ACTIVE       ((uint16_t)0x0050)
-#define TIM_FORCED_INACTIVE     ((uint16_t)0x0040)
-
 /* External variables */
-extern TIM_HandleTypeDef TimHandleHF;  /* High Frequency Timer (Carrier) */
-extern TIM_HandleTypeDef TimHandleLF;  /* Low Frequency Timer (Bit timing) */
 extern uint8_t BitsSentCounter;
-
-/* Functions */
-void TIM_ForcedOC1Config(uint32_t action);
 
 #endif /* __IR_COMMON_H */

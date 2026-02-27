@@ -14,23 +14,39 @@
 #define RC5HIGHSTATE          ((uint8_t)0x02)   /* Manchester high level */
 #define RC5LOWSTATE           ((uint8_t)0x01)   /* Manchester low level */
 
-/* Private variables */
-uint8_t RC5RealFrameLength = 14;              /* RC5 frame is 14 bits */
-uint8_t RC5GlobalFrameLength = 64;            /* Total frame including Manchester */
-uint16_t RC5BinaryFrameFormat = 0;            /* Binary RC5 frame */
-uint32_t RC5ManchesterFrameFormat = 0;        /* Manchester encoded frame */
-__IO uint32_t RC5SendOpCompleteFlag = 1;      /* Send complete flag */
-__IO uint32_t RC5SendOpReadyFlag = 0;         /* Send ready flag */
-uint8_t BitsSentCounter = 0;                  /* Bit counter for transmission */
-RC5_Ctrl_t RC5Ctrl = RC5_CTRL_RESET;          /* Control bit state */
+/* RC5 frame is 14 bits -> Manchester is 28 half-bits */
+#define RC5_REAL_FRAME_LENGTH        ((uint8_t)14)
+#define RC5_MANCHESTER_BITS_LENGTH   ((uint8_t)(RC5_REAL_FRAME_LENGTH * 2))
 
-/* Timer handles (defined in main.c) */
-TIM_HandleTypeDef TimHandleHF;  /* TIM15: 38kHz carrier */
-TIM_HandleTypeDef TimHandleLF;  /* TIM16: 889us bit timing */
+/* Private variables */
+static uint16_t RC5BinaryFrameFormat = 0;      /* Binary RC5 frame */
+static uint32_t RC5ManchesterFrameFormat = 0;  /* Manchester encoded frame (MSB-first) */
+static __IO uint32_t RC5SendOpCompleteFlag = 1;
+static __IO uint32_t RC5SendOpReadyFlag = 0;
+uint8_t BitsSentCounter = 0;                   /* Used by ISR callback */
+
+/* TIM handles provided by CubeMX (defined in main.c) */
+extern TIM_HandleTypeDef htim15;
+extern TIM_HandleTypeDef htim16;
 
 /* Private function prototypes */
 static uint16_t RC5_BinFrameGeneration(uint8_t RC5_Address, uint8_t RC5_Instruction, RC5_Ctrl_t RC5_Ctrl);
-static uint32_t RC5_ManchesterConvert(uint16_t RC5_BinaryFrameFormat);
+static uint32_t RC5_ManchesterConvert(uint16_t rc5BinaryFrame);
+
+void RC5_Carrier_Enable(uint8_t enable)
+{
+  /* Gate TIM16_CH1 without changing frequency/duty cycle:
+     - enable: OC1M = PWM1 (carrier visible)
+     - disable: OC1M = Forced inactive (pin driven low)
+  */
+  uint32_t ccmr1 = TIM16->CCMR1;
+  ccmr1 &= ~TIM_CCMR1_OC1M;
+  ccmr1 |= (enable ? TIM_OCMODE_PWM1 : TIM_OCMODE_FORCED_INACTIVE);
+  TIM16->CCMR1 = ccmr1;
+
+  /* Keep channel output enabled */
+  TIM16->CCER |= TIM_CCER_CC1E;
+}
 
 /**
   * @brief  Initialize RC5 encoder - Configure timers for IR transmission
@@ -39,79 +55,12 @@ static uint32_t RC5_ManchesterConvert(uint16_t RC5_BinaryFrameFormat);
   */
 void RC5_Encode_Init(void)
 {
-  TIM_OC_InitTypeDef sConfigOC = {0};
-  
-  /* HIGH FREQUENCY TIMER (TIM15) - 38kHz Carrier Wave */
-  /* This timer generates the 38kHz modulation carrier */
-  
-  TimHandleHF.Instance = TIM15;
-  TimHandleHF.Init.Prescaler = 31;                    /* 32MHz / 32 = 1MHz */
-  TimHandleHF.Init.CounterMode = TIM_COUNTERMODE_UP;
-  TimHandleHF.Init.Period = IR_ENC_LPERIOD_RC5;       /* 889 for 889us period */
-  TimHandleHF.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  TimHandleHF.Init.RepetitionCounter = 0;
-  TimHandleHF.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  
-  if (HAL_TIM_Base_Init(&TimHandleHF) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  
-  if (HAL_TIM_OC_Init(&TimHandleHF) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  
-  /* Configure Output Compare for timing control */
-  sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = IR_ENC_LPERIOD_RC5;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  
-  if (HAL_TIM_OC_ConfigChannel(&TimHandleHF, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  
-  /* Enable TIM15 interrupt */
-  HAL_NVIC_SetPriority(TIM1_BRK_TIM15_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(TIM1_BRK_TIM15_IRQn);
-  
-  /* LOW FREQUENCY TIMER (TIM16) - 38kHz PWM Carrier */
-  /* This timer generates the actual 38kHz PWM signal with 25% duty cycle */
-  
-  TimHandleLF.Instance = TIM16;
-  TimHandleLF.Init.Prescaler = 0;                     /* No prescaler: 32MHz */
-  TimHandleLF.Init.CounterMode = TIM_COUNTERMODE_UP;
-  TimHandleLF.Init.Period = IR_ENC_HPERIOD_RC5 - 1;   /* 841 for 38kHz */
-  TimHandleLF.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  TimHandleLF.Init.RepetitionCounter = 0;
-  TimHandleLF.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  
-  if (HAL_TIM_Base_Init(&TimHandleLF) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  
-  if (HAL_TIM_PWM_Init(&TimHandleLF) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  
-  /* Configure PWM Channel with 25% duty cycle */
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = IR_ENC_HPERIOD_RC5 / 4;           /* 25% duty cycle */
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  
-  if (HAL_TIM_PWM_ConfigChannel(&TimHandleLF, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  
-  /* Start PWM output (but forced inactive initially) */
-  HAL_TIM_PWM_Start(&TimHandleLF, TIM_CHANNEL_1);
-  TIM_ForcedOC1Config(TIM_FORCED_INACTIVE);
+  /* CubeMX already configured TIM15 (889us) and TIM16 (38kHz PWM on PA6/A5).
+     We only need to make sure the carrier starts disabled (idle low). */
+  RC5_Carrier_Enable(0);
+  BitsSentCounter = 0;
+  RC5SendOpReadyFlag = 0;
+  RC5SendOpCompleteFlag = 1;
 }
 
 /**
@@ -139,8 +88,8 @@ void RC5_Encode_SendFrame(uint8_t RC5_Address, uint8_t RC5_Instruction, RC5_Ctrl
   BitsSentCounter = 0;
   
   /* Reset counter and start timer interrupt */
-  __HAL_TIM_SET_COUNTER(&TimHandleHF, 0);
-  HAL_TIM_Base_Start_IT(&TimHandleHF);
+  __HAL_TIM_SET_COUNTER(&htim15, 0);
+  HAL_TIM_Base_Start_IT(&htim15);
 }
 
 /**
@@ -150,37 +99,24 @@ void RC5_Encode_SendFrame(uint8_t RC5_Address, uint8_t RC5_Instruction, RC5_Ctrl
   */
 void RC5_Encode_SignalGenerate(void)
 {
-  uint32_t bit_msg = 0;
-  
-  if ((RC5SendOpReadyFlag == 1) && (BitsSentCounter < (RC5GlobalFrameLength * 2)))
+  if ((RC5SendOpReadyFlag == 1) && (BitsSentCounter < RC5_MANCHESTER_BITS_LENGTH))
   {
+    uint32_t bit_msg = (RC5ManchesterFrameFormat >> (RC5_MANCHESTER_BITS_LENGTH - 1U - BitsSentCounter)) & 1U;
     RC5SendOpCompleteFlag = 0;
-    
-    /* Extract current bit from Manchester frame */
-    bit_msg = (RC5ManchesterFrameFormat >> BitsSentCounter) & 1;
-    
-    /* Set output state based on bit value */
-    if (bit_msg == 1)
-    {
-      TIM_ForcedOC1Config(TIM_FORCED_ACTIVE);    /* Enable 38kHz carrier */
-    }
-    else
-    {
-      TIM_ForcedOC1Config(TIM_FORCED_INACTIVE);  /* Disable carrier */
-    }
-    
+
+    /* Gate the 38kHz carrier: 1 => PWM, 0 => forced low */
+    RC5_Carrier_Enable((uint8_t)bit_msg);
+
     BitsSentCounter++;
+    return;
   }
-  else
-  {
-    /* Transmission complete */
-    RC5SendOpCompleteFlag = 1;
-    HAL_TIM_Base_Stop_IT(&TimHandleHF);
-    RC5SendOpReadyFlag = 0;
-    BitsSentCounter = 0;
-    TIM_ForcedOC1Config(TIM_FORCED_INACTIVE);
-    __HAL_TIM_DISABLE(&TimHandleHF);
-  }
+
+  /* Transmission complete */
+  RC5SendOpCompleteFlag = 1;
+  HAL_TIM_Base_Stop_IT(&htim15);
+  RC5SendOpReadyFlag = 0;
+  BitsSentCounter = 0;
+  RC5_Carrier_Enable(0);
 }
 
 /**
@@ -215,29 +151,19 @@ static uint16_t RC5_BinFrameGeneration(uint8_t RC5_Address, uint8_t RC5_Instruct
   * @retval Manchester encoded frame
   * @note   Manchester encoding: 0 = 01, 1 = 10
   */
-static uint32_t RC5_ManchesterConvert(uint16_t RC5_BinaryFrameFormat)
+static uint32_t RC5_ManchesterConvert(uint16_t rc5BinaryFrame)
 {
-  uint8_t i = 0;
-  uint16_t Mask = 1;
-  uint16_t bit_format = 0;
-  uint32_t ConvertedMsg = 0;
-  
-  for (i = 0; i < RC5RealFrameLength; i++)
+  uint32_t convertedMsg = 0;
+
+  /* MSB-first: Start bits first on the wire */
+  for (int8_t i = (int8_t)(RC5_REAL_FRAME_LENGTH - 1); i >= 0; i--)
   {
-    bit_format = ((RC5_BinaryFrameFormat >> i) & Mask);
-    ConvertedMsg = ConvertedMsg << 2;
-    
-    if (bit_format != 0)
-    {
-      ConvertedMsg |= RC5HIGHSTATE;  /* Manchester: 1 = 10 */
-    }
-    else
-    {
-      ConvertedMsg |= RC5LOWSTATE;   /* Manchester: 0 = 01 */
-    }
+    uint16_t bit = (uint16_t)((rc5BinaryFrame >> i) & 1U);
+    convertedMsg <<= 2;
+    convertedMsg |= (bit ? RC5HIGHSTATE : RC5LOWSTATE);
   }
-  
-  return ConvertedMsg;
+
+  return convertedMsg;
 }
 
 /**
@@ -245,17 +171,4 @@ static uint32_t RC5_ManchesterConvert(uint16_t RC5_BinaryFrameFormat)
   * @param  action: TIM_FORCED_ACTIVE or TIM_FORCED_INACTIVE
   * @retval None
   */
-void TIM_ForcedOC1Config(uint32_t action)
-{
-  /* Modify CCMR1 register to force output state */
-  uint32_t tmpccmr1 = TimHandleLF.Instance->CCMR1;
-  
-  /* Clear OC1M bits */
-  tmpccmr1 &= ~TIM_CCMR1_OC1M;
-  
-  /* Set forced output mode */
-  tmpccmr1 |= action;
-  
-  /* Write to CCMR1 register */
-  TimHandleLF.Instance->CCMR1 = tmpccmr1;
-}
+/* TIM_ForcedOC1Config removed: gating is done via RC5_Carrier_Enable() */

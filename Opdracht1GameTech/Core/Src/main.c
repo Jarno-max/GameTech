@@ -95,34 +95,25 @@ int main(void)
   MX_TIM15_Init();
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
-  
-  /* Initialize RC5 IR Encoder */
+
+  /* Start 38kHz PWM carrier on TIM16_CH1 (PA6 = Arduino A5) */
+  HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
+  TIM16->BDTR |= TIM_BDTR_MOE;  /* Required for TIM16 output */
+
+  /* Initialize RC5 encoder (uses TIM15 interrupt to gate the TIM16 carrier) */
   RC5_Encode_Init();
-  
+
   /* Blink LED to indicate system ready */
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
   HAL_Delay(200);
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-  
-  /* ========== OSCILLOSCOPE TEST OPTIONS ========== */
-  /* Uncomment ONE of the following test modes: */
-  
-  /* OPTION 1: Continuous 38kHz carrier for basic frequency/duty cycle measurement */
-  /* Measure on PA6: Should see constant 38kHz with 25% duty cycle */
-  
-  /* Re-enable PWM mode (RC5_Encode_Init sets it to forced inactive) */
-  TIM_OC_InitTypeDef sConfigOC_Test = {0};
-  sConfigOC_Test.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC_Test.Pulse = 210;  // 25% duty cycle
-  sConfigOC_Test.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC_Test.OCFastMode = TIM_OCFAST_DISABLE;
-  HAL_TIM_PWM_ConfigChannel(&htim16, &sConfigOC_Test, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1);
-  
-  /* OPTION 2: Send single RC5 test frame for Manchester encoding measurement */
-  /* Uncomment below to send one frame at startup, then stop */
-  // RC5_Encode_SendFrame(1, 12, RC5_CTRL_RESET);
-  // HAL_Delay(100);  // Wait for transmission to complete
+
+  /* ========== OSCILLOSCOPE: meting 1 & 2 ========== */
+  /* Show a short continuous 38kHz carrier for frequency + duty cycle measurement. */
+  /* Measure on PA6 (A5). */
+  RC5_Carrier_Enable(1);
+  HAL_Delay(200);
+  RC5_Carrier_Enable(0);
 
   /* USER CODE END 2 */
 
@@ -133,44 +124,17 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    
-    /* ========== CONTINUOUS TEST MODE ========== */
-    /* OPTION 3: Send RC5 frames repeatedly every 2 seconds */
-    /* Uncomment below for continuous frame transmission */
-    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-    // RC5_Encode_SendFrame(1, 12, toggleBit);
-    // HAL_Delay(50);
-    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-    // HAL_Delay(2000);
-    
-    /* ========== BUTTON MODE (FINAL VERSION) ========== */
-    /* Check if button is pressed */
-    if (buttonPressed)
-    {
-      buttonPressed = 0;  /* Reset flag */
-      
-      /* Blink LED to indicate transmission */
-      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-      
-      /* Send RC5 frame: Address=1, Command=12 (Play/Pause) */
-      RC5_Encode_SendFrame(1, 12, toggleBit);
-      
-      /* Toggle the control bit for next transmission */
-      if (toggleBit == RC5_CTRL_RESET)
-        toggleBit = RC5_CTRL_SET;
-      else
-        toggleBit = RC5_CTRL_RESET;
-      
-      /* Wait for transmission to complete */
-      HAL_Delay(50);
-      
-      /* Turn off LED */
-      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-      
-      /* Debounce delay */
-      HAL_Delay(200);
-    }
-    
+
+    /* ========== OSCILLOSCOPE: meting 3 ========== */
+    /* Send a RC5 frame every 500ms so you can mark the bits. */
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+    RC5_Encode_SendFrame(1, 12, toggleBit);
+    if (toggleBit == RC5_CTRL_RESET) toggleBit = RC5_CTRL_SET;
+    else toggleBit = RC5_CTRL_RESET;
+    HAL_Delay(50);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+    HAL_Delay(500);
+
   }
   /* USER CODE END 3 */
 }
@@ -191,16 +155,10 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  /** Configure LSE Drive Capability
-  */
-  HAL_PWR_EnableBkUpAccess();
-  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
-
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
@@ -229,10 +187,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-
-  /** Enable MSI Auto calibration
-  */
-  HAL_RCCEx_EnableMSIPLLMode();
 }
 
 /**
@@ -249,6 +203,8 @@ static void MX_TIM15_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
 
   /* USER CODE BEGIN TIM15_Init 1 */
 
@@ -259,7 +215,7 @@ static void MX_TIM15_Init(void)
   htim15.Init.Period = 889;
   htim15.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim15.Init.RepetitionCounter = 0;
-  htim15.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim15.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim15) != HAL_OK)
   {
     Error_Handler();
@@ -269,15 +225,42 @@ static void MX_TIM15_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_PWM_Init(&htim15) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim15, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim15, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim15, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN TIM15_Init 2 */
 
   /* USER CODE END TIM15_Init 2 */
+  HAL_TIM_MspPostInit(&htim15);
 
 }
 
@@ -305,7 +288,7 @@ static void MX_TIM16_Init(void)
   htim16.Init.Period = 842;
   htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim16.Init.RepetitionCounter = 0;
-  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
   {
     Error_Handler();
@@ -356,20 +339,11 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : VCP_RX_Pin */
-  GPIO_InitStruct.Pin = VCP_RX_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF3_USART2;
-  HAL_GPIO_Init(VCP_RX_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD3_Pin */
   GPIO_InitStruct.Pin = LD3_Pin;
