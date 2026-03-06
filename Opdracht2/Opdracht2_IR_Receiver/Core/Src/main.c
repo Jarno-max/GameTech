@@ -132,6 +132,11 @@ int main(void)
   /* Schakel stdio-buffering uit zodat printf direct zichtbaar is in PuTTY */
   setvbuf(stdout, NULL, _IONBF, 0);
 
+  /* Zet URS=1: Update-interrupt wordt alleen gegenereerd bij overflow,
+     NIET bij slave-reset trigger. Anders roept elke dalende flank
+     RC5_ResetPacket() aan en kan er nooit een volledig frame worden opgebouwd. */
+  TIM2->CR1 |= TIM_CR1_URS;
+
   /* Initialiseer RC5 tijdsdrempelwaarden (1 tick = 1us met prescaler=31 @ 32MHz) */
   RC5_Init_Timing();
 
@@ -143,6 +148,7 @@ int main(void)
   __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
 
   printf("RC5 IR Receiver klaar. Richt afstandsbediening op TSOP4838.\r\n");
+  fflush(stdout);
 
   /* USER CODE END 2 */
 
@@ -158,6 +164,7 @@ int main(void)
       RC5_Decode(&IR_FRAME);
       printf("[RC5] Adres: 0x%02X | Commando: 0x%02X | Toggle: %d\r\n",
              IR_FRAME.Address, IR_FRAME.Command, IR_FRAME.ToggleBit);
+      fflush(stdout);
     }
   }
   /* USER CODE END 3 */
