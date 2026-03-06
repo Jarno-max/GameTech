@@ -1,0 +1,7 @@
+../Core/Src/rc5_decode.c:262:6:RC5_Init_Timing	8	static
+../Core/Src/rc5_decode.c:285:6:RC5_Decode	16	static
+../Core/Src/rc5_decode.c:313:6:RC5_ResetPacket	4	static
+../Core/Src/rc5_decode.c:327:6:RC5_DataSampling	24	static
+../Core/Src/rc5_decode.c:377:16:RC5_GetPulseLength	16	static
+../Core/Src/rc5_decode.c:398:13:RC5_modifyLastBit	16	static
+../Core/Src/rc5_decode.c:422:13:RC5_WriteBit	16	static
