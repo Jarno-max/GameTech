@@ -138,12 +138,7 @@ Voeg een scope-screenshot toe met het volledige frame en meet 3 willekeurige bit
 
 
 **Bespreking afwijking**  
-De afwijking kan veroorzaakt worden door:
-- toleranties van de afstandsbediening (oscillator),
-- jitter door demodulatie/filtering in TSOP4838,
-- trigger/meetcursor onnauwkeurigheid,
-- ruis of omgevingslicht,
-- (afhankelijk van implementatie) timingvariatie door interrupts.
+Kleine afwijkingen t.o.v. de theoretische bitduur zijn normaal en kunnen o.a. komen door toleranties van de zender en meetonnauwkeurigheid (cursors/trigger) op de oscilloscoop.
 
 ### 5.4 Meting 2: startbit, field bit en toggle bit identificeren
 - **Startbit (S):** altijd logisch ‘1’ en staat aan het begin van het frame.
