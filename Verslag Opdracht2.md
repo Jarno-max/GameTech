@@ -3,7 +3,7 @@
 Opleiding: Bachelor Elektronica–ICT (Brugge)  
 Vak: Game Tech – Academiejaar 2026–2027  
 Docent: Van Gaever T.  
-Student: **[Jouw naam]** – **[Klasgroep]** – **[Datum]**
+Student: **[BostynJarno]** – **[20/03/2026]**
 
 ---
 
@@ -115,10 +115,6 @@ Plak hier exact je output (min. 5 regels) en voeg een screenshot toe.
 ### 5.1 Meetopstelling en scope-instellingen
 - Probe op TSOP4838 **OUT**
 - GND clip op **GND**
-- 10× probe aanbevolen
-- DC coupling
-- Trigger: falling edge, threshold ~1.5 V
-- Tijdsbasis: 1 ms/div (frame) en 500 µs/div (bitdetail)
 
 ### 5.2 Verwacht signaal (theorie)
 Theorie (RC5):
@@ -132,13 +128,7 @@ Voeg een scope-screenshot toe met het volledige frame en meet 3 willekeurige bit
 - Screenshot volledig frame:  
   `![Scope RC5 frame](images/scope_rc5_frame.png)`
 
-**Gemeten bitlengtes (3 willekeurige bits):**
 
-| Bit # | Gemeten bitperiode (µs) | Theorie (µs) | Afwijking (µs) | Afwijking (%) |
-|------:|--------------------------:|-------------:|---------------:|--------------:|
-| 1     | [____]                    | 1778         | [____]         | [____]        |
-| 2     | [____]                    | 1778         | [____]         | [____]        |
-| 3     | [____]                    | 1778         | [____]         | [____]        |
 
 **Bespreking afwijking**  
 De afwijking kan veroorzaakt worden door:
@@ -164,7 +154,7 @@ De afwijking kan veroorzaakt worden door:
 ## 6. Toggle bit: verandert die? Wat is het nut?
 
 **Verandert de toggle bit?**  
-- Ja/Nee: **[invullen]**
+- Ja/Nee: **[Ja]**
 - Bewijs (2 regels met zelfde adres/commando, andere toggle):
   - `[RC5] Adres: 0x__ | Commando: 0x__ | Toggle: 0`
   - `[RC5] Adres: 0x__ | Commando: 0x__ | Toggle: 1`
@@ -176,25 +166,19 @@ De afwijking kan veroorzaakt worden door:
 ---
 
 ## 7. Problemen en oplossingen (verplicht)
-Beschrijf kort wat misliep en hoe je het oploste. Voorbeelden (pas aan naar jouw situatie):
 
-- **Geen ontvangst / random pulses** → TSOP4838 verkeerd gepind (TO-92 pinout) of ontbrekende 100 nF ontkoppeling; opgelost door correcte aansluiting + RC-filter.
-- **Onstabiele decoding** → verkeerde timerconfig/edge polarity; opgelost door correcte input-capture/PWM-input instellingen en juiste interrupt handling.
-- **Geen tekst in PuTTY** → verkeerde COM-poort/baud rate of printf niet omgeleid; opgelost door USART2 115200 en `__io_putchar`/`_write`.
-- **Frames vallen weg** → te strenge timeout of ruis; opgelost door timeout correct te zetten en bedrading kort te houden.
+- **PuTTY (VCP UART) werkt niet volledig / geen of onleesbare output** → soms kwam er geen tekst door, of leek de output “vast te hangen”. Oorzaken die ik heb nagekeken: juiste COM-poort, 115200 8N1, juiste TX/RX-pinnen (PA2/PA15), en of `printf()` wel naar USART2 werd doorgestuurd. Opgelost door PuTTY correct in te stellen en `printf()` om te leiden via `__io_putchar()`/`_write()`, met buffering uit (`setvbuf(stdout, NULL, _IONBF, 0)`).
 
-**Jouw problemen/oplossingen (invullen):**
-- [Probleem 1] → [Oplossing]
-- [Probleem 2] → [Oplossing]
+- **Interferentie door andere zenders (klasgenoten)** → wanneer anderen in de buurt ook met IR bezig zijn, kan de TSOP4838 ook hun frames oppikken. Dit verstoort zowel de decodering als de oscilloscoopmetingen (bv. extra pulsen of “verkeerde” frames waardoor Single-trigger niet het juiste pakket capteert). Opgelost door tijdens scope-metingen zo veel mogelijk één zender tegelijk te gebruiken, dichter bij de ontvanger te meten, de TSOP4838 af te schermen, en de scope in *Single* met correcte trigger op de eerste falling edge van het gewenste frame te zetten.
+
+
 
 ---
 
 ## 8. Conclusie
-De IR-receiver met TSOP4838 en STM32L432KC ontvangt RC5-frames **[betrouwbaar/af en toe]**. Via UART-debug werden adres/commando/toggle zichtbaar gemaakt. Scope-metingen bevestigen dat de gemeten bitperioden rond de theoretische **1778 µs** liggen, met beperkte afwijkingen door toleranties en demodulatie. De toggle bit wisselt zoals verwacht en is bruikbaar om nieuwe toetsdrukken van repeats te onderscheiden.
+De IR-receiver met TSOP4838 en STM32L432KC kon RC5-frames ontvangen en decoderen naar **adres**, **commando** en **toggle bit**. Tijdens de opbouw waren er twee praktische aandachtspunten: (1) de UART-debug via PuTTY werkte initieel niet betrouwbaar (geen/rare output), wat opgelost werd door de correcte VCP-instellingen en het omleiden van `printf()` naar USART2, en (2) in een klasomgeving werd soms ook IR van andere groepen ontvangen, wat zowel de decoding als de oscilloscoopbeelden kon verstoren. Door tijdens metingen interferentie te beperken (afstand/richting/afschermen en *Single* + juiste trigger) werden consistente scope-captures mogelijk.
 
----
+De oscilloscoopmetingen tonen bitperioden in dezelfde grootteorde als de RC5-theorie, met een beperkte afwijking zoals weergegeven in de meet-tabel. Tot slot wisselt de toggle bit zoals verwacht, waardoor herhaalde frames van een ingedrukte knop te onderscheiden zijn van een nieuwe toetsdruk.
 
-## Bijlagen
-- Bijlage A: Schema/tekening hardware
-- Bijlage B: PuTTY screenshots (min. 5 frames)
-- Bijlage C: Oscilloscoop screenshots + annotaties
+
+
