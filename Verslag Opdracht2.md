@@ -131,7 +131,9 @@ Theorie (RC5):
 Voeg een scope-screenshot toe met het volledige frame en meet 3 willekeurige bits.
 
 - Screenshot volledig frame:  
-  `![Scope RC5 frame](images/scope_rc5_frame.png)`
+  ![Scope RC5 frame](<Opdracht2/Scoop Receiver.png>)
+
+*(Op dit screenshot kan je het volledige RC5-frame herkennen. Gebruik cursors/measure om 3 bitperioden te meten en vul ze in in je tabel.)*
 
 
 
@@ -151,8 +153,10 @@ De afwijking kan veroorzaakt worden door:
 **Aanduiding in je scopebeeld (invullen + annoteren):**
 - Waar start frame: **[beschrijf]**
 - Bitvolgorde: `S | F | C | A4..A0 | C5..C0`
-- Screenshot met annotaties:  
-  `![Annotated scope](images/scope_annotated_bits.png)`
+- Screenshot (toggle = 0):  
+  ![Scope RC5 toggle 0](<Opdracht2/Scoop Reciever Toggle0.png>)
+
+*(Tip: Annoteer in dezelfde afbeelding waar S, F en C staan door de eerste 3 bitposities te markeren. Combineer dit met je gedecodeerde UART-output zodat je zeker bent van de bitvolgorde.)*
 
 ---
 
