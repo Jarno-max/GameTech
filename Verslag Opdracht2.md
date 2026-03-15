@@ -15,12 +15,15 @@ In deze opdracht werd een IR-ontvanger opgebouwd met een **TSOP4838** (38 kHz de
 ## 2. Hardwareopstelling
 
 ### 2.1 Componenten
-- STM32 Nucleo-32 met STM32L432KC
+- STM32 Nucleo-32 met STM32L432KC (receiver)
 - TSOP4838 IR receiver module
 - 100 Ω serieweerstand (voeding TSOP)
 - 100 nF condensator (ontkoppeling TSOP)
 - USB-kabel naar ST-Link (VCP UART)
 - Breadboard + jumpers (indien gebruikt)
+
+*(Testopstelling, indien gebruikt / zoals op de foto zichtbaar lijkt):*
+- Tweede STM32 Nucleo-32 board als IR-zender/testbron (om RC5/IR-signalen te genereren tijdens testen)
 
 ### 2.2 Aansluitschema (pin mapping)
 
@@ -42,13 +45,12 @@ De TSOP4838-uitgang is **actief laag en geïnverteerd**:
 
 Dit is belangrijk bij interpretatie van Manchester/RC5 (de decode-bibliotheek houdt hiermee rekening).
 
-### 2.4 Schematisch overzicht (verplicht)
+### 2.4 Schematisch overzicht
 Voeg hier je schema/tekening toe (zender + ontvanger, alle verbindingen).  
 
 - Afbeelding:  
   `![Schematisch overzicht](images/schema_opdracht2.png)`
 
-*(Maak indien nodig een map `images/` en plaats je bestanden daarin.)*
 
 ---
 
