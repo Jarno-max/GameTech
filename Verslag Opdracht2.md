@@ -74,10 +74,13 @@ TIM2 werd gebruikt om flanken op **PA0** te meten (PWM Input / Input Capture con
 - Timeout/overflow wordt gebruikt om een onvolledig frame te resetten.
 
 **CubeMX-notities (invullen):**
-- Timer: **[TIM2]**
-- Ingangspin: **[PA0 – TIM2_CH1]**
-- Interrupts enabled: **[ja/nee + welke]**
-- Belangrijke prescaler/clock: **[invullen]**
+- Timer: **TIM2** (Input Capture op CH1/CH2 voor flankmeting)
+- Ingangspin: **PA0 – TIM2_CH1** (AF1)
+- Interrupts enabled: **ja** → **TIM2 global interrupt (TIM2_IRQn)** ingeschakeld (priority 0)
+- Belangrijke prescaler/clock:
+  - APB1 timer clock (TIM2): **32 MHz**
+  - Prescaler: **31** ⇒ tellerfrequentie = 32 MHz / (31+1) = **1 MHz** (dus **1 tick = 1 µs**)
+  - Period (ARR): **65535**
 
 ### 3.3 `printf()` omleiding
 De printf-uitvoer werd omgeleid naar USART2 zodat frames live in PuTTY zichtbaar zijn. Buffering werd uitgeschakeld zodat tekst onmiddellijk verschijnt.
