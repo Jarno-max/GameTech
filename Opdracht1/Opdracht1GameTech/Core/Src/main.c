@@ -78,6 +78,9 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
+  /* Free PB3 (LD3) in case SWO/trace is enabled by the debugger. */
+  DBGMCU->CR &= ~(DBGMCU_CR_TRACE_IOEN | DBGMCU_CR_TRACE_MODE);
+
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -104,7 +107,7 @@ int main(void)
 
   /* Blink LED to indicate system ready */
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-  HAL_Delay(200);
+  HAL_Delay(500);
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 
   /* ========== OSCILLOSCOPE: meting 1 & 2 ========== */
@@ -124,7 +127,14 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    /* Button removed (not used in Opdracht 1). */
+    /* Test-zender: stuur periodiek een RC5 frame uit zodat de receiver (Opdracht 2)
+       betrouwbaar getest kan worden. */
+     /* Heartbeat: zichtbaar knipperen = code draait */
+     HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+
+    RC5_Encode_SendFrame(0x00, 0x10, toggleBit);
+    toggleBit = (toggleBit == RC5_CTRL_RESET) ? RC5_CTRL_SET : RC5_CTRL_RESET;
+    HAL_Delay(300);
 
   }
   /* USER CODE END 3 */
@@ -363,6 +373,12 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+    /* Visible fault indicator on LD3 without relying on SysTick. */
+    HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+    for (volatile uint32_t i = 0; i < 200000; i++)
+    {
+      __NOP();
+    }
   }
   /* USER CODE END Error_Handler_Debug */
 }
