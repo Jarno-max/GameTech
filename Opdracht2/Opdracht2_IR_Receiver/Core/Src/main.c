@@ -128,7 +128,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  
   /* Schakel stdio-buffering uit zodat printf direct zichtbaar is in PuTTY */
   setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -147,9 +147,11 @@ int main(void)
   /* Activeer timer overflow interrupt voor timeout-detectie */
   __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
 
-  printf("RC5 IR Receiver klaar. Richt afstandsbediening op TSOP4838.\r\n");
-  fflush(stdout);
+  char startup_msg[] = "RC5 IR Receiver klaar. Richt afstandsbediening op TSOP4838.\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*)startup_msg, sizeof(startup_msg)-1, 100);
 
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -159,12 +161,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+    HAL_Delay(100); // 100ms knipperen ter controle of main loop draait
+
     if (RC5FrameReceived != NO)
     {
       RC5_Decode(&IR_FRAME);
-      printf("[RC5] Adres: 0x%02X | Commando: 0x%02X | Toggle: %d\r\n",
-             IR_FRAME.Address, IR_FRAME.Command, IR_FRAME.ToggleBit);
-      fflush(stdout);
+      
+      char buf[64];
+      int len = snprintf(buf, sizeof(buf), "[RC5] Adres: 0x%02X | Commando: 0x%02X | Toggle: %d\r\n",
+                         IR_FRAME.Address, IR_FRAME.Command, IR_FRAME.ToggleBit);
+      HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+      
+      RC5FrameReceived = NO; // Vergeet niet de flag te resetten, anders blijf je printen!
     }
   }
   /* USER CODE END 3 */
@@ -191,11 +200,16 @@ void SystemClock_Config(void)
   // HAL_PWR_EnableBkUpAccess();
   // __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
 
+  /** Configure LSE Drive Capability
+  */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-  // RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
@@ -219,6 +233,11 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {

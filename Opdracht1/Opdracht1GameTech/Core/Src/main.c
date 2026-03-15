@@ -45,7 +45,6 @@ TIM_HandleTypeDef htim15;
 TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN PV */
-volatile uint8_t buttonPressed = 0;  /* Button press flag */
 RC5_Ctrl_t toggleBit = RC5_CTRL_RESET;  /* RC5 toggle bit */
 /* USER CODE END PV */
 
@@ -125,15 +124,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    /* ========== OSCILLOSCOPE: meting 3 ========== */
-    /* Send a RC5 frame every 500ms so you can mark the bits. */
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-    RC5_Encode_SendFrame(1, 12, toggleBit);
-    if (toggleBit == RC5_CTRL_RESET) toggleBit = RC5_CTRL_SET;
-    else toggleBit = RC5_CTRL_RESET;
-    HAL_Delay(50);
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-    HAL_Delay(500);
+    /* Button removed (not used in Opdracht 1). */
 
   }
   /* USER CODE END 3 */
@@ -341,6 +332,7 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_SYSCFG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
@@ -353,34 +345,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
-  
-  /* Configure Button Pin (PA1) as input with pull-up and interrupt */
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;    /* Interrupt on falling edge */
-  GPIO_InitStruct.Pull = GPIO_PULLUP;             /* Internal pull-up */
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-  
-  /* Enable EXTI interrupt */
-  HAL_NVIC_SetPriority(EXTI1_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
-
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-
-/**
-  * @brief EXTI line detection callback
-  * @param GPIO_Pin: Specifies the pins connected to the EXTI line
-  * @retval None
-  */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-  if (GPIO_Pin == GPIO_PIN_1)
-  {
-    buttonPressed = 1;  /* Set button flag */
-  }
-}
 
 /* USER CODE END 4 */
 
