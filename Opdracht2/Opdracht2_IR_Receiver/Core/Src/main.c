@@ -108,7 +108,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
         tim2_ch1_edge_count++;
         if (highPulse < tim2_ch1_min) tim2_ch1_min = highPulse;
         if (highPulse > tim2_ch1_max) tim2_ch1_max = highPulse;
-        RC5_DataSampling(highPulse, 0);
+        /* TSOP4838 output is active-low (inverted): treat actual FALLING as logical RISING */
+        RC5_DataSampling(highPulse, 1);
       }
     }
     else if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
@@ -129,7 +130,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
       tim2_last_low_pulse = lowPulse;
       tim2_have_low_pulse = 1;
 
-      RC5_DataSampling(lowPulse, 1);
+      /* TSOP4838 output is active-low (inverted): treat actual RISING as logical FALLING */
+      RC5_DataSampling(lowPulse, 0);
     }
   }
 }
@@ -309,31 +311,14 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  /** Configure LSE Drive Capability
-  */
-  // HAL_PWR_EnableBkUpAccess();
-  // __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
-
-  /** Configure LSE Drive Capability
-  */
-  HAL_PWR_EnableBkUpAccess();
-  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
-
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-  RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 16;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+  /* Use HSI16 for maximum robustness (no LSE crystal needed, no PLL needed). */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_OFF;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -343,24 +328,17 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Enable MSI Auto calibration
-  */
-  HAL_RCCEx_EnableMSIPLLMode();
+  /* No MSI auto-calibration needed (HSI-based clock). */
 }
 
 /* USER CODE BEGIN 4 */
@@ -376,8 +354,20 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
+  /* Fail-safe: blink LD3 (PB3) even if clocks/UART init failed. */
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  /* Configure PB3 as push-pull output (no HAL dependency). */
+  GPIOB->MODER &= ~(3u << (3u * 2u));
+  GPIOB->MODER |=  (1u << (3u * 2u));
+  GPIOB->OTYPER &= ~(1u << 3u);
+  GPIOB->PUPDR  &= ~(3u << (3u * 2u));
   while (1)
   {
+    GPIOB->ODR ^= (1u << 3u);
+    for (volatile uint32_t i = 0; i < 200000u; i++)
+    {
+      __NOP();
+    }
   }
   /* USER CODE END Error_Handler_Debug */
 }

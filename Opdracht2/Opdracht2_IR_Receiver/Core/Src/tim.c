@@ -42,7 +42,9 @@ void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 31;
+    /* With HSI16 and APB1 prescaler = 1 => TIM2 clock ~16 MHz.
+      Prescaler 15 => 16 MHz / (15+1) = 1 MHz => 1 tick = 1 us. */
+    htim2.Init.Prescaler = 15;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 3600;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
