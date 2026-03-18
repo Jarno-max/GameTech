@@ -36,6 +36,9 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+/* Set to 1 to print periodic timing diagnostics over UART. */
+#define ENABLE_DIAG 0
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -213,7 +216,9 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+#if ENABLE_DIAG
   uint32_t last_diag_print_ms = HAL_GetTick();
+#endif
   while (1)
   {
     /* USER CODE END WHILE */
@@ -222,6 +227,7 @@ int main(void)
     HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
     HAL_Delay(100); // 100ms knipperen ter controle of main loop draait
 
+#if ENABLE_DIAG
     /* Diagnostiek: toon of er IR-flanken binnenkomen op TIM2.
        Verwachting: bij IR-activiteit lopen deze tellers op. */
     if ((HAL_GetTick() - last_diag_print_ms) >= 1000)
@@ -271,6 +277,7 @@ int main(void)
       HAL_UART_Transmit(&huart2, (uint8_t*)diag, (uint16_t)dlen, 100);
       last_diag_print_ms = HAL_GetTick();
     }
+#endif
 
     if (RC5FrameReceived != NO)
     {
