@@ -78,12 +78,46 @@ TIM2 werd gebruikt om flanken op **PA0** te meten (PWM Input / Input Capture con
 - Ingangspin: **PA0 – TIM2_CH1** (AF1)
 - Interrupts enabled: **ja** → **TIM2 global interrupt (TIM2_IRQn)** ingeschakeld (priority 0)
 - Belangrijke prescaler/clock:
-  - APB1 timer clock (TIM2): **32 MHz**
-  - Prescaler: **31** ⇒ tellerfrequentie = 32 MHz / (31+1) = **1 MHz** (dus **1 tick = 1 µs**)
-  - Period (ARR): **65535**
+  - TIM2 clock: **16 MHz** (HSI16)
+  - Prescaler: **15** ⇒ tellerfrequentie = 16 MHz / (15+1) = **1 MHz** (dus **1 tick = 1 µs**)
+  - Period (ARR): **3600** ⇒ overflow na **3.6 ms** (timeout/reset bij geen IR-activiteit)
 
 ### 3.3 `printf()` omleiding
 De printf-uitvoer werd omgeleid naar USART2 zodat frames live in PuTTY zichtbaar zijn. Buffering werd uitgeschakeld zodat tekst onmiddellijk verschijnt.
+
+### 3.4 Korte code-uitleg (implementatie)
+Onderstaand wordt enkel de **kernlogica** toegelicht (geen code dump). Het doel is aantonen dat de ontvangen TSOP4838-envelope correct wordt omgezet naar RC5-bits en uiteindelijk naar **adres/commando/toggle**.
+
+**1) Flankmeting met TIM2 (PA0)**
+- TIM2 staat in **reset slave mode** op de TI1-trigger: bij elke **falling edge** (begin van een “burst”, TSOP is actief-laag) wordt de teller gereset.
+- **CH1 (falling capture)** meet de tijd tussen twee falling edges (periode fall→fall).
+- **CH2 (rising capture, indirect TI)** meet de duur van de **lage puls** (low-time) tussen falling→rising.
+- Omdat de RC5-decoder tijdsduren verwacht tussen opeenvolgende Manchester-overgangen (typisch rond **T ≈ 889 µs** of **2T ≈ 1778 µs**), wordt uit de gemeten waarden een bruikbare pulsduur afgeleid:
+  - `highPulse = period(fall→fall) - lowPulse(fall→rise)`
+  - die `highPulse` komt overeen met de resterende “hoogte”-tijd en vermijdt dat een fall→fall meting soms **3T/4T** lijkt.
+- Zowel hardwarematig (IC filter) als softwarematig (minimumduur) worden zeer korte spikes/glitches gefilterd.
+
+**2) TSOP4838 is geïnverteerd (actief-laag)**
+- De TSOP-uitgang is **hoog in idle** en trekt **laag** tijdens een IR-burst.
+- Daarom worden de gemeten flanken omgezet naar “logische” flanken voor de decoder:
+  - echte **falling** wordt behandeld als **logische rising**
+  - echte **rising** wordt behandeld als **logische falling**
+
+**3) RC5 bit-decoding op basis van 1T/2T en ‘last bit’**
+- In de decoder wordt elke gemeten pulsduur eerst geclassificeerd als **1T** of **2T** binnen toleranties.
+- Met een kleine toestandsmachine (via een ‘last bit’ + logica-tabellen) wordt uit de sequentie van flanken de volgende bitwaarde bepaald.
+- Zodra alle bits van het frame zijn opgebouwd, wordt een “frame ontvangen”-flag gezet.
+
+**4) Timeout/reset om halve frames te vermijden**
+- Bij **geen flanken** binnen ongeveer **3.6 ms** treedt een timer overflow op: het lopende pakket wordt gereset zodat een volgend frame terug proper kan starten.
+- Belangrijk detail: de timer-update interrupt wordt zo ingesteld dat die enkel op echte overflow komt (niet op elke slave-reset). Concreet gebeurt dit door **URS=1** te gebruiken, anders zou elk begin van een puls het pakket meteen resetten.
+
+**5) Verwerking in de main loop + UART-output**
+- De main loop wacht tot de “frame ontvangen”-flag actief wordt, roept dan de decode-functie op en print:
+  - `Adres` (5 bits)
+  - `Commando` (6 bits, incl. uitbreiding via field bit)
+  - `Toggle` (1 bit)
+- Nadien wordt de flag gereset zodat hetzelfde frame niet blijft herprinten.
 
 ---
 
